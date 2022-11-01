@@ -1,44 +1,56 @@
 %%
-% p = fileparts(pwd);
-% addpath(genpath(p));
+p = fileparts(pwd);
+addpath(genpath(p));
 %% simulate signal
 duration = 120;
-frequency = [0.2, 0.4, 0.8, 1.6, 3.2];
-amplitude = [1, 2, 3, 2, 1];
 srate = 200;
 
 nSamples = round(duration * srate);
 period = 1 / srate;
 seconds = (1:nSamples).*period;
-data = zeros(1, nSamples);
-for i=1:length(frequency)
-    data = data + amplitude(i) * sin(2 * pi * frequency(i) * seconds);
-end
-%% confirm that signal was simulated as intended
-figure
-plot(data)
-minFreq = 0.1;
-window = round((2 / minFreq) * srate);
-noverlap = round(window/2);
-f = frequency;
-figure
-pwelch(data, window, noverlap, f, srate);
+
+dataIn = randn(1,nSamples);
 %% format input
-EEG.data = data;
+EEG.data = dataIn;
 EEG.srate = srate;
-detrendIn = struct('detrendChannels', 1, 'detrendType', 'linear', ...
-                    'detrendCutoff', 0.5, 'detrendStepSize', 0.02, ...
+detrendType = 'linear';
+% detrendType = 'high pass';
+% doesn't work
+% Unrecognized function or variable 'pop_eegfiltnew'.
+% 
+% Error in removeTrend (line 66)
+%         pop_eegfiltnew(EEG1, detrendOut.detrendCutoff, []);
+% 
+% Error in testRemoveTrend (line 24)
+% [EEG, detrendOut] = removeTrend(EEG, detrendIn);
+ 
+detrendCutoff = 1;
+
+detrendIn = struct('detrendChannels', 1, 'detrendType', detrendType, ...
+                    'detrendCutoff', detrendCutoff, 'detrendStepSize', 0.02, ...
                     'detrendCommand', []);
 %%
 [EEG, detrendOut] = removeTrend(EEG, detrendIn);
+dataOut = EEG.data;
+%%
+figure
+tfestimate(dataIn,dataOut,window,[],[],srate)
+xlim([0.25,1.25])
+ylim([-15,0])
+title("Linear detrending; detrendCutoff = 1")
+%%
+figure
+[b,a] = butter(5,detrendCutoff/(srate/2),'high');
+dataOut = filter(b,a,dataIn);
+tfestimate(dataIn,dataOut,window,[],[],srate);
+xlim([0.25,1.25])
+ylim([-15,0])
+title("High pass butterworth filter; cutoff = 1 Hz")
 
-%% plot detrended data
+%%
 figure
-plot(EEG.data)
-minFreq = 0.1;
-window = round((2 / minFreq) * srate);
-noverlap = round(window/2);
-f = frequency;
-figure
-pwelch(EEG.data, window, noverlap, f, srate);
-% Frequencies below 0.5 Hz not fully attenuated
+freqz(b,a,[],srate)
+title("High pass butterworth filter; cutoff = 1 Hz")
+
+
+
